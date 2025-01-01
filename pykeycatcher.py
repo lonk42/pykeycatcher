@@ -3,6 +3,8 @@ import hid
 import sys
 import argparse
 from time import sleep
+from socket import gethostname
+from paho.mqtt import publish as pahomqtt_publish
 
 def manual_device_menu(hid_devices):
 	print("Listing all HID devices...")
@@ -32,8 +34,11 @@ def main():
 	elif args.manual:
 		chosen_device = manual_device_menu(hid_devices)
 	else:
-		print("ERROR: No HID device was selected, use either --manual or --config to set one")
+		print("ERROR: No HID device was defined, use either --manual or --config to set one")
 		sys.exit(1)
+
+	# Special variables
+	led_brightness = 0
 
 	# Select the device to connect
 	print(f"Connecting to {chosen_device['product_string']}")
@@ -49,8 +54,32 @@ def main():
 			data = hid_device.read(64)
 			if data:
 				print("Received data:", data)
+
+				# Custom defenitions
+				if data[3] == 235:
+					led_brightness = clamp(led_brightness - 1, 0, 24)
+					mqtt_publish("reee/reee", str(int(float(led_brightness) * 10.625)))
+				if data[3] == 236:
+					led_brightness = 0
+					mqtt_publish("reee/reee", str(int(float(led_brightness) * 10.625)))
+				if data[3] == 237:
+					led_brightness = clamp(led_brightness + 1, 0, 24)
+					mqtt_publish("reee/reee", str(int(float(led_brightness) * 10.625)))
+
 	except Exception as e:
 		print(e)
+
+def mqtt_publish(topic, payload):
+	print(f'topic: "{topic}", payload: "{payload}"')
+	pahomqtt_publish.single(topic, payload, hostname="localhost")
+
+def clamp(n, min, max): 
+    if n < min: 
+        return min
+    elif n > max: 
+        return max
+    else: 
+        return n 
 
 if __name__ == "__main__":
 	main()
