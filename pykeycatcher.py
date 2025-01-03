@@ -6,6 +6,7 @@ import argparse
 import traceback
 from time import sleep
 from socket import gethostname
+from evdev import UInput, ecodes
 from paho.mqtt import publish as pahomqtt_publish
 
 def manual_device_menu(hid_devices):
@@ -62,8 +63,12 @@ def main():
 	while True:
 
 		try:
+			# Create a UInput device
+			print("Creating virtual UInput device...")
+			uinput_device = UInput()
+
 			# Connect to the device
-			print(f"Connecting to device {config['device']['vendor_id']},{config['device']['product_id']}")
+			print(f"Connecting to device {config['device']['vendor_id']},{config['device']['product_id']}...")
 			hid_device.open(config['device']['vendor_id'], config['device']['product_id'])
 			hid_device.set_nonblocking(1)
 			
@@ -78,20 +83,33 @@ def main():
 					if args.debug:
 						print("Received data: ", data)
 
-					# Run against actions
+					# Run against action
 					if data[3] in config['actions']:
 
 						# Value operation
-						for value in config['actions'][data[3]]['values']:
-							adjust_value(config, value)
+						if 'values' in config['actions'][data[3]].keys():
+							for value in config['actions'][data[3]]['values']:
+								adjust_value(config, value)
 	
 						# MQTT operation
-						for mqtt_operation in config['actions'][data[3]]['mqtt']:
-							mqtt_publish(config, mqtt_operation['topic'], config['values'][mqtt_operation['value']]['value'])
+						if 'mqtt' in config['actions'][data[3]].keys():
+							for mqtt_operation in config['actions'][data[3]]['mqtt']:
+								mqtt_publish(config, mqtt_operation['topic'], config['values'][mqtt_operation['value']]['value'])
+
+						# Mirror operation
+						if 'mirror' in config['actions'][data[3]].keys() and config['actions'][data[3]]['mirror']:
+							if args.debug:
+								print(f'Sending mirror for key {data}')
+								print(f'Sending mirror for key {[0] * 8}')
+								uinput_device.write(ecodes.EV_KEY, data[3], 1)
+								uinput_device.write(ecodes.EV_KEY, data[3], 0)
+								uinput_device.syn()
 
 		except Exception:
 			print("ERROR: reconnecting to device...")
 			print(traceback.format_exc())
+			uinput_device.close()
+			hid_device.close()
 			sleep(5)
 
 def adjust_value(config, value):

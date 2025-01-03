@@ -1,3 +1,4 @@
 hidapi
 paho-mqtt
 pyyaml
+evdev

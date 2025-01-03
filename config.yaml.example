@@ -12,6 +12,8 @@ values:
       max: 255
 
 actions:
+  122:
+    mirror: true
   123:
     values:
       - name: led_brightness
