@@ -10,9 +10,21 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Running as an unprivileged user
+
+By default your user probably can't read and write any USB device. To open a single USB device up to users you can do so with a udev rule.
+```
+# Find the ID of your device
+sudo lsusb
+
+# Create a udev rule for it, supliment the ID's for your device
+echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="1189", ATTR{idProduct}=="8890", MODE="0666"' | sudo tee /etc/udev/rules.d/40-usbkeyboard.rules 
+```
+
 ## Usage
 
-To use without a configuration file run with the `--manual` switch.
+Either `--config` or `--manual` must be provided. Use  `--help` for a full list of options.
 ```bash
 ./pykeycatcher.py --manual
+./pykeycatcher.py --config config.yaml
 ```
