@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import hid
 import sys
+import yaml
 import argparse
+import traceback
 from time import sleep
 from socket import gethostname
 from paho.mqtt import publish as pahomqtt_publish
@@ -10,16 +12,34 @@ def manual_device_menu(hid_devices):
 	print("Listing all HID devices...")
 	for i, device in enumerate(hid_devices):
 		print(f"{i}: Vendor ID: {device['vendor_id']}, Product ID: {device['product_id']}, Product: {device['product_string']}")
-	device_index = int(input("Select a device index to connect to: "))
+	device_index = int(input("Enter device index: "))
 	return hid_devices[device_index]
 
+def parse_config(file_path):
+	try:
+		with open(file_path, 'r') as file:
+			config = yaml.safe_load(file)
+		return config
+	except FileNotFoundError:
+		print(f"Error: The file '{file_path}' was not found.")
+	except yaml.YAMLError as e:
+		print(f"Error parsing YAML file: {e}")
+	except Exception as e:
+		print(f"An unexpected error occurred: {e}")
+
+	# Must have been an error
+	sys.exit(1)
+
 def main():
+
+	# Initalize
+	config = {}
 
 	# Setup CLI arugments
 	parser = argparse.ArgumentParser(description="HID Input Listener")
 	parser.add_argument('--manual', action='store_true', help="Provide manual device selection menu")
+	parser.add_argument('--debug', action='store_true', help="Enable debug logging")
 	parser.add_argument('--config', type=str, help="Path to a configuration file")
-	# TODO add  --device
 	args = parser.parse_args()
 
 	# Get all HID devices on the system
@@ -30,56 +50,78 @@ def main():
 		sys.exit(1)
 
 	if args.config:
-		pass
+		config = parse_config(args.config)
+
 	elif args.manual:
-		chosen_device = manual_device_menu(hid_devices)
+		config['device'] = manual_device_menu(hid_devices)
+	
 	else:
 		print("ERROR: No HID device was defined, use either --manual or --config to set one")
 		sys.exit(1)
 
-	# Special variables
-	led_brightness = 0
+	while True:
 
-	# Select the device to connect
-	print(f"Connecting to {chosen_device['product_string']}")
-	hid_device.open(chosen_device['vendor_id'], chosen_device['product_id'])
-	hid_device.set_nonblocking(1)
+		try:
+			# Connect to the device
+			print(f"Connecting to device {config['device']['vendor_id']},{config['device']['product_id']}")
+			hid_device.open(config['device']['vendor_id'], config['device']['product_id'])
+			hid_device.set_nonblocking(1)
+			
+			# Open the selected HID device
+			print("Listening for inputs...")
+
+			while True:
+				sleep(0.05)
+				data = hid_device.read(64)
+
+				if data:
+					if args.debug:
+						print("Received data: ", data)
+
+					# Run against actions
+					if data[3] in config['actions']:
+
+						# Value operation
+						for value in config['actions'][data[3]]['values']:
+							adjust_value(config, value)
 	
-	# Open the selected HID device
-	print("Listening for inputs... (Press Ctrl+C to exit)")
-		
-	try:
-		while True:
-			sleep(0.05)
-			data = hid_device.read(64)
-			if data:
-				print("Received data:", data)
+						# MQTT operation
+						for mqtt_operation in config['actions'][data[3]]['mqtt']:
+							mqtt_publish(config, mqtt_operation['topic'], config['values'][mqtt_operation['value']]['value'])
 
-				# Custom defenitions
-				if data[3] == 235:
-					led_brightness = clamp(led_brightness - 1, 0, 24)
-					mqtt_publish("reee/reee", str(int(float(led_brightness) * 10.625)))
-				if data[3] == 236:
-					led_brightness = 0
-					mqtt_publish("reee/reee", str(int(float(led_brightness) * 10.625)))
-				if data[3] == 237:
-					led_brightness = clamp(led_brightness + 1, 0, 24)
-					mqtt_publish("reee/reee", str(int(float(led_brightness) * 10.625)))
+		except Exception:
+			print("ERROR: reconnecting to device...")
+			print(traceback.format_exc())
+			sleep(5)
 
-	except Exception as e:
-		print(e)
+def adjust_value(config, value):
 
-def mqtt_publish(topic, payload):
+	# Adjust values do a basic integer operation
+	if 'adjust' in value.keys():
+
+		# Change the value
+		config['values'][value['name']]['value'] += value['adjust']
+
+		# Apply clamping if its defined
+		if 'clamp' in config['values'][value['name']].keys():
+			config['values'][value['name']]['value'] = clamp(
+				config['values'][value['name']]['value'],
+				config['values'][value['name']]['clamp']['min'],
+				config['values'][value['name']]['clamp']['max']
+			)
+
+
+def mqtt_publish(config, topic, payload):
 	print(f'topic: "{topic}", payload: "{payload}"')
-	pahomqtt_publish.single(topic, payload, hostname="localhost")
+	pahomqtt_publish.single(topic, payload, hostname="10.1.1.2")
 
 def clamp(n, min, max): 
-    if n < min: 
-        return min
-    elif n > max: 
-        return max
-    else: 
-        return n 
+	if n < min: 
+		return min
+	elif n > max: 
+		return max
+	else: 
+		return n 
 
 if __name__ == "__main__":
 	main()

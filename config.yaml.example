@@ -1,0 +1,21 @@
+---
+
+device:
+  vendor_id: 4489
+  product_id: 34960
+
+values:
+  led_brightness:
+    value: 255
+    clamp:
+      min: 0
+      max: 255
+
+actions:
+  123:
+    values:
+      - name: led_brightness
+        adjust: -12
+    mqtt:
+      - topic: reee/reeeeee
+        value: led_brightness
