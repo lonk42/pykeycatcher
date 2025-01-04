@@ -1,9 +1,11 @@
 #!/usr/bin/env python
+import os
 import hid
 import sys
 import yaml
 import argparse
 import traceback
+import subprocess
 from time import sleep
 from socket import gethostname
 from evdev import UInput, ecodes
@@ -94,7 +96,7 @@ def main():
 						# MQTT operation
 						if 'mqtt' in config['actions'][data[3]].keys():
 							for mqtt_operation in config['actions'][data[3]]['mqtt']:
-								mqtt_publish(config, mqtt_operation['topic'], config['values'][mqtt_operation['value']]['value'])
+								mqtt_publish(config, mqtt_operation)
 
 						# Mirror operation
 						if 'mirror' in config['actions'][data[3]].keys() and config['actions'][data[3]]['mirror']:
@@ -104,6 +106,11 @@ def main():
 								uinput_device.write(ecodes.EV_KEY, data[3], 1)
 								uinput_device.write(ecodes.EV_KEY, data[3], 0)
 								uinput_device.syn()
+
+						# Process operation
+						if 'process' in config['actions'][data[3]].keys():
+							for process_operation in config['actions'][data[3]]['process']:
+								run_process(config, process_operation)
 
 		except Exception:
 			print("ERROR: reconnecting to device...")
@@ -128,10 +135,30 @@ def adjust_value(config, value):
 				config['values'][value['name']]['clamp']['max']
 			)
 
+def mqtt_publish(config, operation):
+	payload = ''
+	
+	if 'value' in operation.keys():
+		payload = config['values'][operation['value']]['value']
 
-def mqtt_publish(config, topic, payload):
-	print(f'topic: "{topic}", payload: "{payload}"')
-	pahomqtt_publish.single(topic, payload, hostname="10.1.1.2")
+	if 'message' in operation.keys():
+		payload = operation['message']
+	
+	print(f'Sending MQTT, topic: "{operation['topic']}", payload: "{payload}"')
+	pahomqtt_publish.single(operation['topic'], payload, hostname="10.1.1.2")
+
+def run_process(config, process):
+
+	print(f'Running command: "{process['command']}"')
+	subprocess.Popen(
+		process['command'],
+		stdout=subprocess.DEVNULL,
+		stderr=subprocess.DEVNULL,
+		stdin=subprocess.DEVNULL,
+		preexec_fn=os.setsid,
+		shell=True
+	)
+
 
 def clamp(n, min, max): 
 	if n < min: 

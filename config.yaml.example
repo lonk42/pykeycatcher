@@ -21,3 +21,8 @@ actions:
     mqtt:
       - topic: reee/reeeeee
         value: led_brightness
+      - topic: reee/reeeee2
+        message: "send this!"
+  124:
+    process:
+    - command: 'sleep 5; /usr/local/bin/application'
