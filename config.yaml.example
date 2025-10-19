@@ -1,5 +1,7 @@
 ---
 
+mqtt_host: 192.168.1.1
+
 device:
   vendor_id: 4489
   product_id: 34960

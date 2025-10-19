@@ -145,7 +145,7 @@ def mqtt_publish(config, operation):
 		payload = operation['message']
 	
 	print(f'Sending MQTT, topic: "{operation['topic']}", payload: "{payload}"')
-	pahomqtt_publish.single(operation['topic'], payload, hostname="10.1.1.2")
+	pahomqtt_publish.single(operation['topic'], payload, hostname=config['mqtt_host'])
 
 def run_process(config, process):
 
