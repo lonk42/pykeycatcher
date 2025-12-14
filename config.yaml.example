@@ -12,6 +12,11 @@ values:
     clamp:
       min: 0
       max: 255
+  screen_brightness:
+    value: 100
+    clamp:
+      min: 1
+      max: 255
 
 actions:
   122:
@@ -28,3 +33,10 @@ actions:
   124:
     process:
     - command: 'sleep 5; /usr/local/bin/application'
+  126:
+    values:
+      - name: screen_brightness
+        adjust_log_percent: -24
+    mqtt:
+      - topic: display/brightness
+        value: screen_brightness

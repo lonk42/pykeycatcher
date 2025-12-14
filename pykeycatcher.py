@@ -121,19 +121,34 @@ def main():
 
 def adjust_value(config, value):
 
-	# Adjust values do a basic integer operation
+	# Linear adjustment - basic integer operation
 	if 'adjust' in value.keys():
-
-		# Change the value
 		config['values'][value['name']]['value'] += value['adjust']
 
-		# Apply clamping if its defined
-		if 'clamp' in config['values'][value['name']].keys():
-			config['values'][value['name']]['value'] = clamp(
-				config['values'][value['name']]['value'],
-				config['values'][value['name']]['clamp']['min'],
-				config['values'][value['name']]['clamp']['max']
-			)
+	# Logarithmic percentage adjustment
+	if 'adjust_log_percent' in value.keys():
+		current_val = config['values'][value['name']]['value']
+		min_val = config['values'][value['name']]['clamp']['min']
+		max_val = config['values'][value['name']]['clamp']['max']
+
+		# Apply percentage multiplier
+		percent = value['adjust_log_percent']
+		multiplier = 1 + (percent / 100.0)
+		new_val = int(current_val * multiplier)
+
+		# Ensure minimum step size for small values
+		if new_val == current_val and percent != 0:
+			new_val = current_val + (1 if percent > 0 else -1)
+
+		config['values'][value['name']]['value'] = new_val
+
+	# Apply clamping if its defined
+	if 'clamp' in config['values'][value['name']].keys():
+		config['values'][value['name']]['value'] = clamp(
+			config['values'][value['name']]['value'],
+			config['values'][value['name']]['clamp']['min'],
+			config['values'][value['name']]['clamp']['max']
+		)
 
 def mqtt_publish(config, operation):
 	payload = ''
@@ -144,7 +159,7 @@ def mqtt_publish(config, operation):
 	if 'message' in operation.keys():
 		payload = operation['message']
 	
-	print(f'Sending MQTT, topic: "{operation['topic']}", payload: "{payload}"')
+	print(f'Sending MQTT, topic: "{operation['topic']}", payload: "{payload}", host: "{config['mqtt_host']}"')
 	pahomqtt_publish.single(operation['topic'], payload, hostname=config['mqtt_host'])
 
 def run_process(config, process):
