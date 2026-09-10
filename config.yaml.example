@@ -1,42 +1,59 @@
 ---
+# Find the key code for each key with: pykeycatcher.py --manual
 
+# MQTT broker, for mqtt actions. Port 1883, no authentication
 mqtt_host: 192.168.1.1
 
+# USB IDs in decimal. lsusb prints them in hex: 1189:8890 is 4489, 34960
 device:
   vendor_id: 4489
   product_id: 34960
 
+# Integers that actions can change and publish
 values:
-  led_brightness:
-    value: 255
+  brightness:
+    value: 128
     clamp:
       min: 0
       max: 255
-  screen_brightness:
-    value: 100
-    clamp:
-      min: 1
-      max: 255
 
 actions:
-  122:
+  # Send the key on to the desktop, as the evdev key with the same number (KEY_F20)
+  190:
     mirror: true
-  123:
+
+  # Dial left and right: step the brightness by 20% and publish it
+  232:
     values:
-      - name: led_brightness
-        adjust: -12
+      - name: brightness
+        adjust_log_percent: -20
     mqtt:
-      - topic: reee/reeeeee
-        value: led_brightness
-      - topic: reee/reeeee2
-        message: "send this!"
-  124:
+      - topic: office/light/brightness
+        value: brightness
+  234:
+    values:
+      - name: brightness
+        adjust_log_percent: 20
+    mqtt:
+      - topic: office/light/brightness
+        value: brightness
+
+  # Dial press: publish a fixed message
+  233:
+    mqtt:
+      - topic: office/light
+        message: "T"
+
+  # Step the brightness down by a fixed amount
+  235:
+    values:
+      - name: brightness
+        adjust: -32
+    mqtt:
+      - topic: office/light/brightness
+        value: brightness
+
+  # Run a shell command in the background
+  236:
     process:
-    - command: 'sleep 5; /usr/local/bin/application'
-  126:
-    values:
-      - name: screen_brightness
-        adjust_log_percent: -24
-    mqtt:
-      - topic: display/brightness
-        value: screen_brightness
+      - command: 'notify-send "Key 236 pressed"'
